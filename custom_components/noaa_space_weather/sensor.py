@@ -1,175 +1,303 @@
 """Sensor platform for NOAA Space Weather."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+
+from homeassistant.components.sensor import SensorEntityDescription
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorStateClass
+from homeassistant.const import PERCENTAGE
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
 from .const import DOMAIN
 from .const import ICON
 from .entity import NoaaSpaceWeatherEntity
 
 
-def sfi_return(coordinator):
-    if not coordinator.data.get("sfi_data") is None:
-        return coordinator.data.get("sfi_data").get("sfi")
+def _first_record(coordinator, key: str) -> dict[str, Any]:
+    data = coordinator.data.get(key)
+    if isinstance(data, list) and data:
+        return data[0]
+    if isinstance(data, dict):
+        return data
+    return {}
 
 
-def ai_return(coordinator):
-    if not coordinator.data.get("a_index_data") is None:
-        return coordinator.data.get("a_index_data", {}).get("a_index")
+def _value_from(coordinator, source_key: str, value_key: str):
+    record = _first_record(coordinator, source_key)
+    return record.get(value_key)
 
 
-def ai_2d_return(coordinator):
-    if not coordinator.data.get("a_index_data") is None:
-        return coordinator.data.get("a_index_data", {}).get("a_2_day_index")
+def _percent_from(coordinator, source_key: str, value_key: str):
+    value = _value_from(coordinator, source_key, value_key)
+    return float(value) if value is not None else None
 
 
-def ai_3d_return(coordinator):
-    if not coordinator.data.get("a_index_data") is None:
-        return coordinator.data.get("a_index_data", {}).get("a_3_day_index")
+@dataclass(frozen=True, kw_only=True)
+class NoaaSpaceWeatherSensorEntityDescription(SensorEntityDescription):
+    """Describes NOAA Space Weather sensors."""
+
+    value_fn: Callable[[Any], Any]
 
 
-def kpi_return(coordinator):
-    if not coordinator.data.get("kp_index_data") is None:
-        return coordinator.data.get("kp_index_data", {}).get("kp_index")
+SENSOR_TYPES = (
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="solar_flux_index",
+        name="Solar Flux Index",
+        icon="mdi:solar-power",
+        native_unit_of_measurement="sfu",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(coordinator, "sfi_data", "sfi"),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="a_index",
+        name="A Index",
+        icon="mdi:compass-rose",
+        native_unit_of_measurement="nT",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(coordinator, "a_index_data", "a_index"),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="a_index_2_day",
+        name="A Index 2 Day",
+        icon="mdi:compass-rose",
+        native_unit_of_measurement="nT",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "a_index_data", "a_2_day_index"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="a_index_3_day",
+        name="A Index 3 Day",
+        icon="mdi:compass-rose",
+        native_unit_of_measurement="nT",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "a_index_data", "a_3_day_index"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="planetary_k_index",
+        name="Planetary K-Index",
+        icon="mdi:alpha-k-box",
+        native_unit_of_measurement="Kp",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(coordinator, "kp_index_data", "kp_index"),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="sunspot_number",
+        name="Sunspot Number",
+        icon="mdi:sun-wireless",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(coordinator, "ssn_data", "ssn"),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="polar_cap_absorption",
+        name="Polar Cap Absorption",
+        icon="mdi:sign-pole",
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "probabilities_data", "polar_cap_absorption"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="c_class_1_day_probability",
+        name="C-Class 1 Day Probability",
+        icon="mdi:weather-sunny-alert",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "c_class_1_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="c_class_2_day_probability",
+        name="C-Class 2 Day Probability",
+        icon="mdi:weather-sunny-alert",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "c_class_2_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="c_class_3_day_probability",
+        name="C-Class 3 Day Probability",
+        icon="mdi:weather-sunny-alert",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "c_class_3_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="m_class_1_day_probability",
+        name="M-Class 1 Day Probability",
+        icon="mdi:sun-wireless-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "m_class_1_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="m_class_2_day_probability",
+        name="M-Class 2 Day Probability",
+        icon="mdi:sun-wireless-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "m_class_2_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="m_class_3_day_probability",
+        name="M-Class 3 Day Probability",
+        icon="mdi:sun-wireless-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "m_class_3_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="x_class_1_day_probability",
+        name="X-Class 1 Day Probability",
+        icon="mdi:sun-wireless",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "x_class_1_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="x_class_2_day_probability",
+        name="X-Class 2 Day Probability",
+        icon="mdi:sun-wireless",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "x_class_2_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="x_class_3_day_probability",
+        name="X-Class 3 Day Probability",
+        icon="mdi:sun-wireless",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "x_class_3_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="proton_10mev_1_day_probability",
+        name="10 MeV Proton 1 Day Probability",
+        icon="mdi:radioactive",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "10mev_protons_1_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="proton_10mev_2_day_probability",
+        name="10 MeV Proton 2 Day Probability",
+        icon="mdi:radioactive",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "10mev_protons_2_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="proton_10mev_3_day_probability",
+        name="10 MeV Proton 3 Day Probability",
+        icon="mdi:radioactive",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _percent_from(
+            coordinator, "probabilities_data", "10mev_protons_3_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="predicted_f107cm_1_day",
+        name="Predicted 10.7 cm Flux 1 Day",
+        icon="mdi:radio-tower",
+        native_unit_of_measurement="sfu",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "predicted_f107cm_flux_data", "tencmfcst_1_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="predicted_f107cm_2_day",
+        name="Predicted 10.7 cm Flux 2 Day",
+        icon="mdi:radio-tower",
+        native_unit_of_measurement="sfu",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "predicted_f107cm_flux_data", "tencmfcst_2_day"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="predicted_f107cm_3_day",
+        name="Predicted 10.7 cm Flux 3 Day",
+        icon="mdi:radio-tower",
+        native_unit_of_measurement="sfu",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "predicted_f107cm_flux_data", "tencmfcst_3_day"
+        ),
+    ),
+)
 
 
-def ssn_return(coordinator):
-    if not coordinator.data.get("ssn_data") is None:
-        return coordinator.data.get("ssn_data", {}).get("ssn")
-
-
-def x1_return(coordinator):
-    if not coordinator.data.get("probabilities_data") is None:
-        return float(
-            coordinator.data.get("probabilities_data", [{}])[0].get("x_class_1_day")
-        )
-
-
-def m1_return(coordinator):
-    if not coordinator.data.get("probabilities_data") is None:
-        return coordinator.data.get("probabilities_data", [{}])[0].get("m_class_1_day")
-
-
-def polar_cap_absorption_return(coordinator):
-    if not coordinator.data.get("probabilities_data") is None:
-        return coordinator.data.get("probabilities_data", [{}])[0].get(
-            "polar_cap_absorption"
-        )
-
-
-async def async_setup_entry(hass, entry, async_add_devices):
+async def async_setup_entry(
+    hass,
+    entry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+):
     """Setup sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    sensormap = [
-        {
-            "name": "SFI",
-            "desc": "Solar Flux Index",
-            "data": sfi_return,
-        },
-        {
-            "name": "AI",
-            "desc": "A Index",
-            "data": ai_return,
-        },
-        {
-            "name": "AI2D",
-            "desc": "A Index 2 Day",
-            "data": ai_2d_return,
-        },
-        {
-            "name": "AI3D",
-            "desc": "A Index 3 Day",
-            "data": ai_3d_return,
-        },
-        {
-            "name": "KPI",
-            "desc": "Planetary K-Index",
-            "data": kpi_return,
-        },
-        {
-            "name": "SSN",
-            "desc": "Sunspot Number",
-            "data": ssn_return,
-        },
-        {
-            "name": "PolarCapAbsorption",
-            "desc": "Polar Cap Absorption",
-            "data": polar_cap_absorption_return,
-            "state_class": None,
-            "icon": "mdi:sign-pole",
-            "unit": None,
-        },
-        {
-            "name": "x1",
-            "icon": "mdi:sun-wireless",
-            "desc": "X-Class 1 Day Probability",
-            "data": x1_return,
-            "unit": "%",
-        },
-        {
-            "name": "m1",
-            "icon": "mdi:sun-wireless-outline",
-            "desc": "M-Class 1 Day Probability",
-            "data": m1_return,
-            "unit": "%",
-        },
-    ]
-    async_add_devices(
-        [NoaaSpaceWeatherSensor(coordinator, entry, sensor=s) for s in sensormap]
+    async_add_entities(
+        [NoaaSpaceWeatherSensor(coordinator, entry, description) for description in SENSOR_TYPES]
     )
 
 
-class NoaaSpaceWeatherSensor(NoaaSpaceWeatherEntity):
-    """noaa_space_weather Sensor class."""
+class NoaaSpaceWeatherSensor(NoaaSpaceWeatherEntity, SensorEntity):
+    """NOAA Space Weather sensor."""
 
-    def __init__(self, coordinator, entry, sensor):
-        self.sensor = sensor
+    def __init__(self, coordinator, entry, entity_description):
+        self.entity_description = entity_description
         super().__init__(coordinator, entry)
 
     @property
-    def state_class(self):
-        return self.sensor.get("state_class", "measurement")
-
-    @property
-    def unit_of_measurement(self):
-        return self.sensor.get("unit", "")
-
-    @property
-    def options(self):
-        return self.sensor.get("options", None)
-
-    @property
-    def state(self):
-        """Return the state of the sensor."""
-        if self.coordinator.data:
-            data = self.sensor["data"](self.coordinator)
-            return data
-        else:
-            return None
-
-    @property
     def unique_id(self):
-        return f"swpc {self.sensor['name']}"
+        return f"{self.config_entry.entry_id}_{self.entity_description.key}"
 
     @property
     def name(self):
-        """Return the name of the sensor."""
-        return self.sensor["desc"]
-
-    @property
-    def available(self):
-        """Return the state of the sensor."""
-        return True
+        return self.entity_description.name
 
     @property
     def icon(self):
-        """Return the icon of the sensor."""
-        try:
-            icon = self.sensor["icon"]
-        except KeyError:
-            icon = ICON
-        return icon
+        return self.entity_description.icon or ICON
 
     @property
-    def device_class(self):
-        """Return the device class of the sensor."""
-        return self.sensor.get(
-            "device_class", "noaa_space_weather__custom_device_class"
-        )
+    def native_value(self):
+        return self.entity_description.value_fn(self.coordinator)
+
+    @property
+    def native_unit_of_measurement(self):
+        return self.entity_description.native_unit_of_measurement
+
+    @property
+    def state_class(self):
+        return self.entity_description.state_class
+
+    @property
+    def available(self):
+        return super().available and self.coordinator.data is not None

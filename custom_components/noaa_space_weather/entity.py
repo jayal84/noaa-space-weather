@@ -1,9 +1,12 @@
-"""NoaaSpaceWeatherEntity class"""
+"""Base entity for NOAA Space Weather."""
 
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION
+from .const import DEFAULT_NAME
 from .const import DOMAIN
+from .const import MANUFACTURER
 
 
 class NoaaSpaceWeatherEntity(CoordinatorEntity):
@@ -14,16 +17,18 @@ class NoaaSpaceWeatherEntity(CoordinatorEntity):
         self.config_entry = config_entry
 
     @property
-    def unique_id(self):
-        """Return a unique ID to use for this entity."""
-        return self.config_entry.entry_id
-
-    @property
     def extra_state_attributes(self):
         """Return the state attributes."""
         return {
             "attribution": ATTRIBUTION,
-            "id": str(self.coordinator.data.get("id")),
             "integration": DOMAIN,
-            "state_class": "measurement",
         }
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the integration device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.config_entry.entry_id)},
+            name=DEFAULT_NAME,
+            manufacturer=MANUFACTURER,
+        )
