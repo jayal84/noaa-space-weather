@@ -1,4 +1,3 @@
-"""
 """Custom integration to integrate NOAA Space Weather with Home Assistant."""
 
 from __future__ import annotations
