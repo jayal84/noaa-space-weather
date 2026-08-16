@@ -1,5 +1,8 @@
 """API client for NOAA Space Weather."""
 
+from __future__ import annotations
+
+import asyncio
 import logging
 
 import aiohttp
@@ -21,9 +24,29 @@ class NoaaSpaceWeatherApiClient:
         """Get data from the API."""
         try:
             data = await self.swpc.get_standard()
-            data["predicted_f107cm_flux_data"] = await self._async_get_json(
-                "https://services.swpc.noaa.gov/json/predicted_f107cm_flux.json"
+            predicted_f107cm_flux_data, f107_cm_flux_data, planetary_k_index_1m_data, boulder_k_index_1m_data, forecast_45_day_data = await asyncio.gather(
+                self._async_get_json(
+                    "https://services.swpc.noaa.gov/json/predicted_f107cm_flux.json"
+                ),
+                self._async_get_json(
+                    "https://services.swpc.noaa.gov/json/f107_cm_flux.json"
+                ),
+                self._async_get_json(
+                    "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
+                ),
+                self._async_get_json(
+                    "https://services.swpc.noaa.gov/json/boulder_k_index_1m.json"
+                ),
+                self._async_get_json(
+                    "https://services.swpc.noaa.gov/json/45-day-forecast.json"
+                ),
+                return_exceptions=False,
             )
+            data["predicted_f107cm_flux_data"] = predicted_f107cm_flux_data
+            data["f107_cm_flux_data"] = f107_cm_flux_data
+            data["planetary_k_index_1m_data"] = planetary_k_index_1m_data
+            data["boulder_k_index_1m_data"] = boulder_k_index_1m_data
+            data["forecast_45_day_data"] = forecast_45_day_data
         except Exception:
             data = {}
 

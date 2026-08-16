@@ -35,11 +35,34 @@ def _percent_from(coordinator, source_key: str, value_key: str):
     return float(value) if value is not None else None
 
 
+def _forecast_metric_from(coordinator, metric: str):
+    forecast = coordinator.data.get("forecast_45_day_data", {})
+    records = forecast.get("data", []) if isinstance(forecast, dict) else []
+    if not isinstance(records, list):
+        return None
+
+    for record in records:
+        if record.get("metric") == metric:
+            return record.get("value")
+
+    return None
+
+
+def _first_record_attributes(coordinator, key: str, keys: tuple[str, ...]) -> dict[str, Any]:
+    record = _first_record(coordinator, key)
+    return {
+        attribute_key: record.get(attribute_key)
+        for attribute_key in keys
+        if record.get(attribute_key) is not None
+    }
+
+
 @dataclass(frozen=True, kw_only=True)
 class NoaaSpaceWeatherSensorEntityDescription(SensorEntityDescription):
     """Describes NOAA Space Weather sensors."""
 
     value_fn: Callable[[Any], Any]
+    extra_attributes_fn: Callable[[Any], dict[str, Any]] | None = None
 
 
 SENSOR_TYPES = (
@@ -252,6 +275,62 @@ SENSOR_TYPES = (
             coordinator, "predicted_f107cm_flux_data", "tencmfcst_3_day"
         ),
     ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="observed_f107cm_flux",
+        name="Observed 10.7 cm Flux",
+        icon="mdi:radio-tower",
+        native_unit_of_measurement="sfu",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(coordinator, "f107_cm_flux_data", "flux"),
+        extra_attributes_fn=lambda coordinator: _first_record_attributes(
+            coordinator,
+            "f107_cm_flux_data",
+            (
+                "time_tag",
+                "frequency",
+                "reporting_schedule",
+                "avg_begin_date",
+                "ninety_day_mean",
+                "rec_count",
+            ),
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="planetary_kp_estimated",
+        name="Estimated Planetary Kp",
+        icon="mdi:alpha-k-box",
+        native_unit_of_measurement="Kp",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "planetary_k_index_1m_data", "estimated_kp"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="boulder_k_index",
+        name="Boulder K Index",
+        icon="mdi:alpha-k-box",
+        native_unit_of_measurement="K",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _value_from(
+            coordinator, "boulder_k_index_1m_data", "k_index"
+        ),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="forecast_ap",
+        name="45-Day Forecast Ap",
+        icon="mdi:chart-line",
+        native_unit_of_measurement="nT",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _forecast_metric_from(coordinator, "ap"),
+    ),
+    NoaaSpaceWeatherSensorEntityDescription(
+        key="forecast_f107",
+        name="45-Day Forecast F10.7",
+        icon="mdi:chart-line",
+        native_unit_of_measurement="sfu",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: _forecast_metric_from(coordinator, "f107"),
+    ),
 )
 
 
@@ -301,3 +380,10 @@ class NoaaSpaceWeatherSensor(NoaaSpaceWeatherEntity, SensorEntity):
     @property
     def available(self):
         return super().available and self.coordinator.data is not None
+
+    @property
+    def extra_state_attributes(self):
+        attributes = super().extra_state_attributes.copy()
+        if self.entity_description.extra_attributes_fn is not None:
+            attributes.update(self.entity_description.extra_attributes_fn(self.coordinator))
+        return attributes
