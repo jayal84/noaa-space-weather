@@ -17,9 +17,10 @@ ICON = "mdi:weather-sunny"
 
 # Platforms
 BINARY_SENSOR = "binary_sensor"
+CAMERA = "camera"
 SENSOR = "sensor"
 SWITCH = "switch"
-PLATFORMS = [SENSOR]
+PLATFORMS = [SENSOR, CAMERA]
 
 MANUFACTURER = "NOAA Space Weather Prediction Center"
 
